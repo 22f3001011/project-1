@@ -75,11 +75,17 @@ RUN mkdir -p /data
 # Copy application files
 COPY function_tasks.py .
 COPY main.py .
+COPY .env .
 
-# Environment variables
+# Environment variables with defaults
 ENV PIP_ROOT_USER_ACTION=ignore
-ARG AIPROXY_TOKEN
-ENV AIPROXY_TOKEN=${AIPROXY_TOKEN}
+ARG OPEN_AI_PROXY_URL=http://aiproxy.sanand.workers.dev/openai/v1/chat/completions
+ARG OPEN_AI_EMBEDDING_URL=http://aiproxy.sanand.workers.dev/openai/v1/embeddings
+ARG OPEN_AI_PROXY_TOKEN=eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6IjIyZjMwMDEwMTFAZHMuc3R1ZHkuaWl0bS5hYy5pbiJ9.LkE-L3x00t6esnJCRIanP6IFr2TAcqm6kj8-opeKxng
+
+ENV OPEN_AI_PROXY_URL=$OPEN_AI_PROXY_URL
+ENV OPEN_AI_EMBEDDING_URL=$OPEN_AI_EMBEDDING_URL
+ENV OPEN_AI_PROXY_TOKEN=$OPEN_AI_PROXY_TOKEN
 
 # Expose port
 EXPOSE 8000
