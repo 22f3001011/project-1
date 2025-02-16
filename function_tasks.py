@@ -125,7 +125,7 @@ def convert_function_to_openai_schema(func: Callable) -> dict:
  
 def format_file_with_prettier(file_path: str, prettier_version: str):
     """
-    Format the contents of a specified file using Prettier, ensuring the file is updated in-place.
+    Format the contents of a specified file using Prettier with local installation.
     
     Args:
         file_path: The path to the file to format.  
@@ -134,38 +134,29 @@ def format_file_with_prettier(file_path: str, prettier_version: str):
     input_file_path = ensure_local_path(file_path)
     
     try:
-        # First check if Node.js is installed
-        subprocess.run(["node", "--version"], check=True, capture_output=True)
-    except subprocess.CalledProcessError:
-        raise RuntimeError("Node.js is not installed. Please install Node.js first: https://nodejs.org/")
-    except FileNotFoundError:
-        raise RuntimeError("Node.js is not installed. Please install Node.js first: https://nodejs.org/")
+        # Create a local package.json if it doesn't exist
+        if not os.path.exists('package.json'):
+            subprocess.run(["node", "-e", "require('fs').writeFileSync('package.json', JSON.stringify({}))"], check=True)
         
-    try:
-        # Install prettier locally if not already installed
+        # Install prettier locally in the current directory
         subprocess.run(
-            ["npm", "install", f"prettier@{prettier_version}"], 
+            ["node", "-e", f"require('child_process').execSync('npm install prettier@{prettier_version} --save-dev')"],
             check=True,
-            capture_output=True
+            shell=True  # This is needed for Windows
         )
         
-        # Use local prettier installation instead of npx
-        prettier_path = "./node_modules/.bin/prettier"
+        # Use the local prettier installation
+        prettier_path = os.path.join(os.getcwd(), 'node_modules', '.bin', 'prettier')
+        if os.name == 'nt':  # Windows
+            prettier_path += '.cmd'
+        
         subprocess.run([prettier_path, "--write", input_file_path], check=True)
         
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Error running Prettier: {str(e)}")
-    except FileNotFoundError as e:
-        raise RuntimeError(f"Error: {str(e)}. Make sure npm is installed and in your PATH.")    
-    """
-    Format the contents of a specified file using a particular formatting tool, ensuring the file is updated in-place.
-    Args:
-        file_path: The path to the file to format.  
-        prettier_version: The version of Prettier to use.
-    """
-    input_file_path = ensure_local_path(file_path)
-    subprocess.run(["npx", f"prettier@{prettier_version}", "--write", input_file_path])
-
+    except Exception as e:
+        raise RuntimeError(f"Error: {str(e)}. Make sure Node.js is installed.")
+        
 def query_gpt(user_input: str,task: str):
     response = requests.post(
         URL_CHAT,
@@ -356,9 +347,9 @@ def extract_text_from_image(image_path: str, output_file: str, task: str):
     print(response["choices"][0]["message"])
     with open(output_file_path, "w") as file:
         file.write(response["choices"][0]["message"]["content"].replace(" ", ""))       
-def extract_specific_content_and_create_index(input_file: str, output_file: str, extension: str,content_marker: str):
+def extract_specific_content_and_create_index(input_file: str, output_file: str, extension: str, content_marker: str):
     """
-    Identify all files with a specific extension in a directory.For each file, extract particular content (e.g., the first occurrence of a header) and create an index file mapping filenames to their extracted content.
+    Identify all files with a specific extension in a directory. For each file, extract particular content (e.g., the first occurrence of a header) and create an index file mapping filenames to their extracted content.
     
     Args:
         input_file (str): The directory containing the files to index.
@@ -382,6 +373,8 @@ def extract_specific_content_and_create_index(input_file: str, output_file: str,
                     break  
 
         relative_path = os.path.relpath(extenstion_file, input_file_path)
+        # Replace backslashes with forward slashes
+        relative_path = relative_path.replace("\\", "/")
 
         index[relative_path] = title if title else ""
 
